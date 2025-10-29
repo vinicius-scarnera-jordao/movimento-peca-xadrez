@@ -1,0 +1,130 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+
+#define N 8
+
+typedef struct { int r, c; } Pos;
+
+int in_bounds(int r, int c) { return r >= 0 && r < N && c >= 0 && c < N; }
+
+void clear_board(char b[N][N]) {
+  for (int i = 0; i < N; i++)
+    for (int j = 0; j < N; j++)
+      b[i][j] = '.';
+}
+
+void print_board(char b[N][N]) {
+  puts("   a b c d e f g h");
+  for (int i = 0; i < N; i++) {
+    printf("%d  ", N - i);
+    for (int j = 0; j < N; j++) printf("%c ", b[i][j]);
+    printf("%d\n", N - i);
+  }
+  puts("   a b c d e f g h");
+}
+
+Pos parse_square(const char *s) {
+  // aceita "e4" (coluna a..h, linha 1..8)
+  Pos p = (Pos){-1, -1};
+  if (!s || !isalpha(s[0]) || !isdigit(s[1])) return p;
+  int col = tolower(s[0]) - 'a';
+  int row_from_bottom = s[1] - '1';
+  int r = N - 1 - row_from_bottom;
+  if (in_bounds(r, col)) p = (Pos){r, col};
+  return p;
+}
+
+void place_piece(char b[N][N], Pos p, char ch) {
+  if (in_bounds(p.r, p.c)) b[p.r][p.c] = ch;
+}
+
+/* ==================== EXIGÊNCIAS DO PROFESSOR ==================== */
+
+/* TORRE — apenas FOR (4 direções) */
+void rook_for(char b[N][N], Pos p) {
+  for (int c = p.c + 1; c < N; c++) b[p.r][c] = '*';     // direita
+  for (int c = p.c - 1; c >= 0; c--) b[p.r][c] = '*';    // esquerda
+  for (int r = p.r + 1; r < N; r++) b[r][p.c] = '*';     // baixo
+  for (int r = p.r - 1; r >= 0; r--) b[r][p.c] = '*';    // cima
+}
+
+/* BISPO — apenas WHILE (4 diagonais) */
+void bishop_while(char b[N][N], Pos p) {
+  int r, c;
+  r = p.r - 1; c = p.c + 1; while (in_bounds(r, c)) { b[r][c] = '*'; r--; c++; } // NE
+  r = p.r - 1; c = p.c - 1; while (in_bounds(r, c)) { b[r][c] = '*'; r--; c--; } // NO
+  r = p.r + 1; c = p.c + 1; while (in_bounds(r, c)) { b[r][c] = '*'; r++; c++; } // SE
+  r = p.r + 1; c = p.c - 1; while (in_bounds(r, c)) { b[r][c] = '*'; r++; c--; } // SO
+}
+
+/* RAINHA (básico) — DO…WHILE nas 8 direções */
+void queen_do_while(char b[N][N], Pos p) {
+  const int dir[8][2] = { {-1,0},{1,0},{0,-1},{0,1},{-1,1},{-1,-1},{1,1},{1,-1} };
+  for (int k = 0; k < 8; k++) {
+    int r = p.r, c = p.c;
+    do {
+      r += dir[k][0]; c += dir[k][1];
+      if (!in_bounds(r, c)) break;
+      b[r][c] = '*';
+    } while (1);
+  }
+}
+
+/* CAVALO — LOOPS ANINHADOS */
+void knight_nested(char b[N][N], Pos p) {
+  for (int dr = -2; dr <= 2; dr++) {
+    for (int dc = -2; dc <= 2; dc++) {
+      if (dr == 0 || dc == 0) continue;
+      int adr = dr < 0 ? -dr : dr, adc = dc < 0 ? -dc : dc;
+      if (adr + adc == 3) { // combinações do "L"
+        int r = p.r + dr, c = p.c + dc;
+        if (in_bounds(r, c)) b[r][c] = '*';
+      }
+    }
+  }
+}
+
+/* RAINHA (avançado) — RECURSIVIDADE + múltiplas condições */
+void step_recursive(char b[N][N], int r, int c, int dr, int dc) {
+  r += dr; c += dc;
+  if (!in_bounds(r, c)) return;      // condição de parada (fora do tabuleiro)
+  b[r][c] = '*';
+  step_recursive(b, r, c, dr, dc);   // avança na mesma direção
+}
+void queen_recursive(char b[N][N], Pos p) {
+  const int dir[8][2] = { {-1,0},{1,0},{0,-1},{0,1},{-1,1},{-1,-1},{1,1},{1,-1} };
+  for (int k = 0; k < 8; k++) step_recursive(b, p.r, p.c, dir[k][0], dir[k][1]);
+}
+
+/* ============================== MAIN ============================== */
+
+int main(void) {
+  char board[N][N]; clear_board(board);
+
+  int opc; char casa[8];
+  printf("1) Torre (FOR)\n");
+  printf("2) Bispo (WHILE)\n");
+  printf("3) Rainha (DO-WHILE)\n");
+  printf("4) Cavalo (loops aninhados)\n");
+  printf("5) Rainha (recursividade)\n");
+  printf("Opcao: ");
+  if (scanf("%d", &opc) != 1) return 0;
+
+  printf("Casa (ex.: e4): ");
+  if (scanf("%7s", casa) != 1) return 0;
+  Pos p = parse_square(casa);
+  if (!in_bounds(p.r, p.c)) { puts("Casa inválida."); return 0; }
+
+  switch (opc) {
+    case 1: place_piece(board, p, 'R'); rook_for(board, p); break;
+    case 2: place_piece(board, p, 'B'); bishop_while(board, p); break;
+    case 3: place_piece(board, p, 'Q'); queen_do_while(board, p); break;
+    case 4: place_piece(board, p, 'N'); knight_nested(board, p); break;
+    case 5: place_piece(board, p, 'Q'); queen_recursive(board, p); break;
+    default: puts("Opcao inválida."); return 0;
+  }
+
+  print_board(board);
+  return 0;
+}
